@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PMU — Le Chochoille</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root {
+    --bg:#0f1220; --panel:#181c30; --ink:#e9ecff; --muted:#9aa3c7;
+    --line:#2a3158; --accent:#6aa7ff; --good:#79e17b; --bad:#ff6a6a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b0e1a,#0f1220);color:var(--ink);
+       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #22263d}
+  header h1{margin:0;font-size:20px;letter-spacing:.4px}
+  main{max-width:1100px;margin:16px auto 80px;padding:0 16px;display:grid;grid-template-columns:340px 1fr;gap:16px}
+  .panel{background:var(--panel);border:1px solid #22263d;border-radius:14px;padding:14px}
+  .panel h2{margin:.2rem 0 .6rem;font-size:16px;color:#cbd3ff}
+  input,select,button{background:#0f1326;border:1px solid #2a3052;border-radius:10px;padding:9px 10px;color:var(--ink);font-size:14px}
+  button{cursor:pointer;border-color:#3a4a7d}
+  button.primary{background:#10224a;border-color:#5c84ff}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .tag{border:1px solid #2a3158;padding:6px 10px;border-radius:999px;font-size:12px;background:#0f1326}
+  .history{max-height:280px;overflow:auto;border:1px solid #2a3158;border-radius:12px}
+  .history ul{list-style:none;margin:0;padding:0}
+  .history li{border-bottom:1px solid #1f2442;padding:8px 10px;font-size:14px}
+  .muted{color:var(--muted)}
+  .grid{position:relative;background:#0f1326;border:1px solid #2a3158;border-radius:14px;padding:14px;min-height:380px}
+  .finish{position:absolute;right:50px;top:12px;bottom:12px;width:10px;background:#e6e7f1;border-radius:4px}
+  .track{position:relative;height:72px;display:flex;align-items:center;margin:18px 0 22px;border-bottom:1px dashed #293056}
+  .track:last-child{border-bottom:none}
+  .runner{position:absolute;left:18px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:8px;transition:transform .28s ease}
+  .runner .card{width:60px;height:72px;border-radius:10px;border:1px solid #2a3158;background:#11152a;display:flex;align-items:center;justify-content:center;font-weight:600}
+  .cardsRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .mini{width:56px;height:74px;border-radius:8px;border:1px solid #2a3158;background:#11152a;display:flex;align-items:center;justify-content:center;font-size:12px}
+  .mini.face-down{color:#9aa3c7;opacity:.8}
+  .footer{text-align:center;color:#7d86b2;font-size:12px;padding:16px 0 22px}
+  .pill{padding:3px 8px;border-radius:999px;border:1px solid #2a3158}
+  .ok{color:var(--good)} .danger{color:var(--bad)}
+  @media (max-width:900px){ main{grid-template-columns:1fr} .grid{min-height:360px} }
+
+  /* Modal Règles */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
+  .modal-backdrop.show{display:flex}
+  .modal{width:min(760px,100%);max-height:85vh;overflow:auto;background:var(--panel);border:1px solid #2a3158;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+  .modal header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #22263d}
+  .modal header h3{margin:0;font-size:18px;color:#cbd3ff}
+  .modal .content{padding:14px;color:var(--ink)}
+  .modal .content ul{margin:0;padding-left:18px;line-height:1.45}
+  .modal .content li{margin:8px 0}
+  .close-x{background:#11152a;border:1px solid #2a3158;border-radius:10px;padding:6px 10px;color:var(--ink)}
+
+  .grid{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  .grid-inner{position:relative; padding-right:24px; width:100%}
+  @media (max-width: 740px){
+    main{grid-template-columns:1fr}
+    header{position:sticky; top:0; background:linear-gradient(180deg,#0b0e1a,#0f1220); z-index:100}
+    .track{height:64px; margin:14px 0 18px}
+    .runner .card{width:50px;height:62px}
+    .cardsRow{gap:8px}
+    .mini{width:50px;height:66px;font-size:11px}
+    .grid-inner{position:relative; padding-right:24px; width:100%}
+  header h1{font-size:18px}
+  header .row button{padding:8px 10px; font-size:14px}
+  .tag{padding:5px 8px; font-size:11px}
+
+  /* --- Sticky bottom bar (mobile) --- */
+  .bottom-bar{display:none}
+  @media (max-width:740px){
+    .bottom-bar{
+      position:fixed; left:0; right:0; bottom:0;
+      padding:10px calc(12px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
+      background:linear-gradient(180deg,#0c1020,#141a33);
+      border-top:1px solid #22263d;
+      display:flex; gap:10px; align-items:center; justify-content:center;
+      z-index:999;
+    }
+    .bottom-bar button{flex:1; padding:14px 16px; font-size:16px; border-radius:12px}
+    main{padding-bottom:110px} /* room for sticky bar */
+  }
+
+
+  /* --- Anti débordement horizontal --- */
+  html, body { overflow-x: hidden; }
+  .grid { overflow-x: hidden; }
+  .grid-inner { min-width: 0; width: 100%; padding-right: 24px; }
+  .finish { right: 12px; }
+
+  @media (max-width: 740px){
+    .track{height:58px; margin:12px 0 14px}
+    .runner .card{width:46px;height:58px}
+    .mini{width:46px;height:60px;font-size:10px}
+    .cardsRow{gap:6px}
+  }
+
+
+  /* --- Barre d'action sous la course --- */
+  .actionRow{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 6px}
+  .actionRow button{padding:12px 14px; border-radius:12px; font-size:15px}
+  @media (max-width:740px){
+    #draw, #newGame { display:none; } /* cache les boutons du header sur mobile */
+    .actionRow button{flex:1}
+  }
+
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1220">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+</head>
+<body>
+  <header>
+    <h1>PMU — Le Chochoille 🏇🍻</h1>
+    <div class="row">
+      <button class="primary" id="newGame" type="button">Nouvelle partie</button>
+      <button id="draw" type="button">Tirer une carte (avance)</button>
+      <button id="showRules" type="button" title="Règles du jeu">Règles du jeu</button>
+      <span class="tag">Cartes restantes : <strong id="remaining">0</strong></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Parieurs</h2>
+      <div class="row">
+        <input id="bettorName" placeholder="Prénom" autocomplete="off">
+        <select id="bettorSuit">
+          <option value="♣">Trèfle ♣</option>
+          <option value="♦">Carreau ♦</option>
+          <option value="♥">Cœur ♥</option>
+          <option value="♠">Pique ♠</option>
+        </select>
+        <input id="bettorStake" type="number" min="1" max="50" value="1" style="width:80px" title="Nombre de gorgées">
+        <button id="addBet" type="button">Parier</button>
+        <button id="clearBets" type="button">Vider</button>
+      </div>
+      <div class="history" style="margin-top:8px;">
+        <ul id="betsList"></ul>
+      </div>
+
+      
+    </section>
+
+    <section class="panel">
+      <h2>Course (piste 7 cases)</h2>
+      <div class="grid" id="grid">
+        <div class="grid-inner" id="gridInner">
+          <div class="finish" title="Ligne d'arrivée"></div>
+          <!-- Lanes injected by JS -->
+        </div>
+      </div>
+
+      <div class="actionRow"><button id="drawUnder" class="primary" type="button">Tirer une carte</button><button id="newGameUnder" type="button">Nouvelle partie</button></div>
+
+      <h2 style="margin-top:12px;">Cartes de recul (retournées à chaque palier)</h2>
+      <div class="cardsRow" id="bottomRow"></div>
+
+      <h2 style="margin-top:12px;">Cartes tirées (avance)</h2>
+      <div class="cardsRow" id="drawnRow"></div>
+    </section>
+  </main>
+
+  <div class="footer">
+    Tirages (bouton) → <strong>avancent</strong> les valets : carte normale <strong>+1</strong>, <strong>Roi +2</strong>, <strong>Dame −2</strong>.<br/>
+    Quand <em>tous</em> les valets ont franchi le prochain palier, on retourne une carte du bas : elle applique le <strong>recul</strong> (<span class="danger">toutes −1</span>, <strong>D</strong> −2, <strong>R</strong> −1).
+  </div>
+
+  <!-- Modal Règles -->
+  <div id="rulesModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+      <header>
+        <h3 id="rulesTitle">Règles — PMU Le Chochoille</h3>
+        <button id="closeRules" class="close-x" type="button">Fermer</button>
+      </header>
+      <div class="content">
+        <ul>
+          <li><strong>But :</strong> Pariez des gorgées sur le valet (♣ ♦ ♥ ♠) qui gagnera la course.</li>
+          <li><strong>Piste :</strong> 4 valets, piste <strong>7 cases</strong>. Premier à l’arrivée gagne.</li>
+          <li><strong>Avant la course :</strong> ajoutez des parieurs (prénom, symbole, mise en gorgées).</li>
+          <li><strong>Tirages (bouton)</strong> : font <strong>avancer</strong> un symbole — carte normale <strong>+1</strong>, <strong>Roi +2</strong>, <strong>Dame −2</strong>.</li>
+          <li><strong>Cartes de recul (rangée du bas)</strong> : un paquet de <strong>6 cartes</strong> face cachée. À chaque fois que <em>tous</em> les valets franchissent le palier suivant, on <strong>retourne</strong> la prochaine carte du bas et on applique l’effet à son symbole — carte normale <strong>−1</strong>, <strong>Dame −2</strong>, <strong>Roi −1</strong>.</li>
+          <li><strong>Victoire :</strong> on annonce les gagnants/perdants selon les paris.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  /* ====== Jeu PMU - Le Chochoille ====== */
+
+  /* Data cartes */
+  const SUITS = [
+    {s:'♣', name:'Trèfle', color:'noir'},
+    {s:'♦', name:'Carreau', color:'rouge'},
+    {s:'♥', name:'Cœur', color:'rouge'},
+    {s:'♠', name:'Pique', color:'noir'}
+  ];
+  const RANKS = ['A','K','Q','J','10','9','8','7','6','5','4','3','2']; // 52 cartes
+
+  function buildDeck(){
+    const d=[];
+    for (const suit of SUITS){
+      for (const r of RANKS){
+        d.push({rank:r, suit:suit.s, suitName:suit.name, color:suit.color});
+      }
+    }
+    return d;
+  }
+  function shuffle(a){
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  /* État */
+  const TRACK_LEN = 7; // piste fixe
+  let deck=[], bottomDeck=[], finished=false;
+  const pos = { '♣':0, '♦':0, '♥':0, '♠':0 };
+  const bets = []; // {name, suit, stake}
+  const lanes = []; // refs DOM
+  let currentGate = 0; // paliers passés par tous
+
+  /* Helpers DOM */
+  const $ = id => document.getElementById(id);
+  const log = (t)=>{ const ul=$('log'); if(!ul) return; const li=document.createElement('li'); li.textContent=t; ul.prepend(li); };
+  function updateRemaining(){ $('remaining').textContent = deck.length; }
+  function miniCardText(card){ const r=(card.rank==='Q')?'D':card.rank; return `${r} ${card.suit}`; }
+
+  /* Pistes */
+  function buildGrid(){
+    const grid = $('grid');
+    const inner = $('gridInner');
+    inner.querySelectorAll('.track').forEach(n=>n.remove());
+    lanes.length = 0;
+    ['♣','♦','♥','♠'].forEach((suit)=>{
+      const track = document.createElement('div');
+      track.className='track';
+      track.setAttribute('data-suit', suit);
+
+      const runner = document.createElement('div');
+      runner.className='runner';
+      runner.innerHTML = `<div class="card">J ${suit}</div>`; // pas de badge texte
+
+      track.appendChild(runner);
+      inner.appendChild(track);
+      lanes.push({suit, track, runner});
+    });
+    moveAll();
+  }
+
+  function moveRunnerVisual(suit, p){
+    const ref = lanes.find(l=>l.suit===suit);
+    if(!ref) return;
+    const left = 90;
+    const right = Math.max(left, ref.track.clientWidth - 70);
+    const maxSteps = Math.max(1, TRACK_LEN);
+    const clamped = Math.max(0, Math.min(p, maxSteps));
+    const x = left + (right-left) * (clamped / maxSteps);
+    ref.runner.style.transform = `translateY(-50%) translateX(${x-left}px)`;
+  }
+  function moveAll(){ Object.keys(pos).forEach(s=>moveRunnerVisual(s, pos[s])); }
+
+  /* Rangée du bas */
+  function setupBottomRow(){
+    const row = $('bottomRow'); row.innerHTML='';
+    const count = TRACK_LEN - 1; // 6 cartes
+    for(let i=0;i<count;i++){
+      const div = document.createElement('div');
+      div.className = 'mini face-down';
+      div.textContent = 'cachée';
+      row.appendChild(div);
+    }
+  }
+  function revealNextBottom(){
+    if (currentGate >= (TRACK_LEN - 1)) return;
+    const row = $('bottomRow');
+    const cell = row.children[currentGate];
+    const card = bottomDeck[currentGate];
+    if (!cell || !card) return;
+    cell.classList.remove('face-down');
+    cell.textContent = miniCardText(card);
+
+    const s = card.suit;
+    let delta = -1;
+    if (card.rank === 'Q') delta = -2;
+    else if (card.rank === 'K') delta = -1;
+    pos[s] = Math.max(0, Math.min(TRACK_LEN, pos[s] + delta));
+    moveRunnerVisual(s, pos[s]);
+    const action = delta>0 ? `avance de ${delta}` : `recule de ${Math.abs(delta)}`;
+    log(`🔁 Palier ${currentGate+1}/${TRACK_LEN-1} : ${miniCardText(card)} → ${s} ${action}`);
+  }
+
+  function checkGate(){
+    const threshold = currentGate + 1;
+    const allPassed = Object.values(pos).every(p => p >= threshold);
+    if (allPassed && currentGate < (TRACK_LEN - 1)){
+      revealNextBottom();
+      currentGate++;
+    }
+  }
+
+  /* Tirage avance uniquement */
+  function applyAdvance(card){
+    const s = card.suit;
+    let delta = 1;
+    if (card.rank === 'K') delta = 2;
+    else if (card.rank === 'Q') delta = -2;
+    pos[s] = Math.max(0, Math.min(TRACK_LEN, pos[s] + delta));
+    moveRunnerVisual(s, pos[s]);
+    log(`🎲 ${miniCardText(card)} → ${s} avance de ${delta} (case ${pos[s]}/${TRACK_LEN})`);
+    if (pos[s] >= TRACK_LEN){ finished = true; announceWinner(s); return; }
+    checkGate();
+  }
+
+  function announceWinner(suit){
+    const winners = bets.filter(b=>b.suit===suit);
+    const losers  = bets.filter(b=>b.suit!==suit);
+    const li = document.createElement('li'); li.innerHTML = `<strong>🏁 ${suit} gagne !</strong>`; $('log').prepend(li);
+    log((winners.length?('✅ Gagnants : '+winners.map(b=>`${b.name} (+${b.stake})`).join(', ')):'✅ Gagnants : —')+' | '+
+        (losers.length?('❌ Perdants : '+losers.map(b=>`${b.name} (${b.stake})`).join(', ')):'❌ Perdants : —'));
+    setTimeout(()=>{ alert(`🏁 ${suit} gagne !`); }, 120);
+  }
+
+  function draw(){
+    if (finished){ alert('La course est terminée. Nouvelle partie.'); return; }
+    if (deck.length===0){ alert('Plus de cartes. Nouvelle partie ?'); return; }
+    const c = deck.pop();
+    updateRemaining();
+    // Afficher la carte tirée en bas (après les cartes de recul)
+    const cell = document.createElement('div');
+    cell.className = 'mini';
+    cell.textContent = miniCardText(c);
+    document.getElementById('drawnRow').prepend(cell);
+    applyAdvance(c);
+  }
+
+  /* Bets */
+  function renderBets(){
+    const ul = $('betsList'); ul.innerHTML='';
+    bets.forEach((b)=>{
+      const li = document.createElement('li');
+      li.textContent = `• ${b.name} mise ${b.stake} gorgée${b.stake>1?'s':''} sur ${b.suit}`;
+      ul.appendChild(li);
+    });
+  }
+  function addBet(){
+    const name = $('bettorName').value.trim() || 'Joueur';
+    const suit = $('bettorSuit').value;
+    const stake = Math.max(1, parseInt($('bettorStake').value,10) || 1);
+    bets.push({name, suit, stake});
+    $('bettorName').value='';
+    $('bettorStake').value='1';
+    renderBets();
+  }
+  function clearBets(){ bets.length=0; renderBets(); }
+
+  /* Nouvelle partie */
+  function newGame(){
+    finished = false;
+    currentGate = 0;
+    for (const k in pos) pos[k]=0;
+
+    const full = shuffle(buildDeck());
+    const bottomCount = TRACK_LEN - 1;
+    bottomDeck = full.slice(0, bottomCount);
+    deck = full.slice(bottomCount);
+    updateRemaining();
+
+    buildGrid();
+    setupBottomRow();
+    document.getElementById('drawnRow').innerHTML = '';
+    $('log').innerHTML='';
+    
+  }
+
+  /* Modal Règles interactions */
+  const rulesModal = document.getElementById('rulesModal');
+  function openRules(){
+    rulesModal.classList.add('show');
+    rulesModal.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeRules(){
+    rulesModal.classList.remove('show');
+    rulesModal.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('showRules').addEventListener('click', openRules);
+  document.getElementById('closeRules').addEventListener('click', closeRules);
+  rulesModal.addEventListener('click', (e)=>{ if(e.target===rulesModal) closeRules(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && rulesModal.classList.contains('show')) closeRules(); });
+
+  /* Bind */
+  document.getElementById('newGame').addEventListener('click', newGame);
+  const nu=document.getElementById('newGameUnder'); if(nu) nu.addEventListener('click', newGame);
+  document.getElementById('draw').addEventListener('click', draw);
+  const du=document.getElementById('drawUnder'); if(du) du.addEventListener('click', draw);
+  const db=document.getElementById('drawBottom'); if(db) db.addEventListener('click', draw);
+  const ngb=document.getElementById('newGameBottom'); if(ngb) ngb.addEventListener('click', newGame);
+  document.getElementById('addBet').addEventListener('click', addBet);
+  document.getElementById('clearBets').addEventListener('click', clearBets);
+  window.addEventListener('resize', ()=>moveAll());
+
+  /* Boot */
+  newGame();
+})();
+</script>
+
+  
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+  });
+}
+</script>
+
+</body>
+</html>
